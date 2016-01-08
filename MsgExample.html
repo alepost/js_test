@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="us">
+<head>
+	<meta charset="utf-8">
+	<title>Messenger Example 1.0</title>
+	<link href="jquery-ui.css" rel="stylesheet">
+	<link href="jquery.dataTables.min.css" rel="stylesheet">
+    <link href="examples.css" rel="stylesheet" type="text/css">
+	<style>
+	body{
+		font: 100% "Trebuchet MS", sans-serif;
+		margin: 50px;
+	}
+	.demoHeaders {
+		margin-top: 2em;
+	}
+	#dialog-link {
+		padding: .4em 1em .4em 20px;
+		text-decoration: none;
+		position: relative;
+	}
+	#dialog-link span.ui-icon {
+		margin: 0 5px 0 0;
+		position: absolute;
+		left: .2em;
+		top: 50%;
+		margin-top: -8px;
+	}
+	#icons {
+		margin: 0;
+		padding: 0;
+	}
+	#icons li {
+		margin: 2px;
+		position: relative;
+		padding: 4px 0;
+		cursor: pointer;
+		float: left;
+		list-style: none;
+	}
+	#icons span.ui-icon {
+		float: left;
+		margin: 0 4px;
+	}
+	.fakewindowcontain .ui-widget-overlay {
+		position: absolute;
+	}
+	select {
+		width: 200px;
+	}
+	</style>
+</head>
+<body>
+
+<!-- Tabs -->
+<div id="tabs">
+	<ul>
+		<li><a href="#tabs-1">Folders</a></li>
+		<li><a href="#tabs-2">Information</a></li>
+	</ul>
+	<div id="tabs-1"><div id="load-tabs1">Not Loaded</div><div id="text-tabs1"></div><br><button id="ReloadFolders">Reload Folders</button>
+	</div>
+	<div id="tabs-2"><div id="load-tabs2">Not Loaded</div><div id="text-tabs2"></div></div>
+</div>
+<div id="loadingimg"></div>
+<br />
+<h2>
+<div id="HeaderFolderName">Folder Name (id)<div></h2>
+<div id="covertable"><table id="ListMessageTable" class="display" width="100%"></table></div>
+
+<div id="content">
+	<div class="demo-container">
+		<div id="placeholder" class="demo-placeholder"></div>
+	</div>
+</div>
+<p>Messages Count by Folders</p>
+
+<!-- ui-dialog -->
+<div id="dialog" title="Message">
+<div id="dialog-subject"><b>subject:MSG subject</b></div>
+<div id="dialog-send">sender:MSG subject - sendDateTime:MSG subject</div>
+<div id="dialog-status"><i>isFavourited: isOpen: priority:</i></div>
+<div id="dialog-msg"><p>Empty message...</p></div>
+</div>
+
+<div id="dialog-err" title="Error">
+<div id="dialog-errtext">Error</div>
+</div>
+
+<script src="jquery.js"></script>
+<script src="jquery-ui.js"></script>
+<script src="jquery.dataTables.min.js"></script>
+<script src="dataTables.jqueryui.min.js"></script>
+<!--[if lte IE 8]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
+<script language="javascript" type="text/javascript" src="jquery.flot.js"></script>
+<script language="javascript" type="text/javascript" src="jquery.flot.categories.js"></script>
+
+<script>
+(function () {
+	//global var for the page
+	var FoldersList = [];
+	var gMessagesList = [];
+	var CurrentMessage = []; 
+	var PlotData = [];
+	var dataSet = [];
+
+	//DataTable library
+	var ListMessageTable = $("#ListMessageTable").DataTable( {
+        data: dataSet,
+        columns: [
+            { title: "id" },
+            { title: "sender" },
+            { title: "subject" },
+			{ title: "message" },
+            { title: "sendDate" },
+            { title: "isFavourited" },
+            { title: "isOpen" },
+            { title: "priority" }
+		]
+	} );
+
+	function LoadFolders() {
+		//simple "loading..." indecator
+		$("#loadingimg").replaceWith("<div id=\"loadingimg\"><img src=\"images/ajax-loader.gif\" /></div>");
+		var getParams={  };
+
+		$.getJSON("http://guess.dev.altworx.com/api/folders",getParams, function(FoldersData, textStatus, jqXHR){
+			
+			//information on second tab
+			$("#load-tabs2").replaceWith("<div></div>");
+			$("#text-tabs2").append("Folders Updated:"+Date()+"<br>");
+			
+			FoldersList=[];
+			PlotData = [];
+
+			$.each(FoldersData.folders, function(kf,vf){
+				
+				//Data for Folder List
+				var tmparray = [];
+				tmparray.push(vf.order, vf.name, vf.id, vf.hasUnopened, vf.messageCount);
+				FoldersList.push(tmparray);
+		   
+				//Data for Graph
+				var tmpPlotarray = [];
+				tmpPlotarray.push(vf.name, vf.messageCount);
+				PlotData.push(tmpPlotarray);
+	   		});
+			FoldersList.sort(); //sort by "order" value
+			$("#load-tabs1").replaceWith("<div></div>");
+			$("#text-tabs1").replaceWith("<div id=\"text-tabs1\"></div>");
+
+			//Draw Folder List
+			for (var i = 0; i < FoldersList.length; i++) {
+				//bold if the folder has not opened letters
+				if  (FoldersList[i][3]){
+					$("#text-tabs1").append("<a href=\"#\" id=\""+FoldersList[i][2]+"\" title=\""+FoldersList[i][1]+"\"><b>"+FoldersList[i][1]+"("+FoldersList[i][4]+")</b></a><br />");
+				}
+				else
+				{
+					$("#text-tabs1").append("<a href=\"#\" id=\""+FoldersList[i][2]+"\" title=\""+FoldersList[i][1]+"\">"+FoldersList[i][1]+"("+FoldersList[i][4]+")</a><br />");
+				}
+			}
+			
+			//Draw Graph Flot library
+			$.plot("#placeholder", [ PlotData ], {
+				series: {
+					bars: {
+						show: true,
+						barWidth: 0.6,
+						align: "center"
+					}
+				},
+				xaxis: {
+					mode: "categories",
+					tickLength: 0
+				}
+			});
+		
+			//close "loading" indicator
+			$("#loadingimg").replaceWith("<div id=\"loadingimg\"></div>");
+			//messages from first folder in the list
+			LoadMessages(FoldersList[0][2],FoldersList[0][1]);
+
+		}).fail(function(jqXHR, textStatus, errorThrown){
+			//information on second tab
+			$("#load-tabs2").replaceWith("<div></div>");
+			$("#text-tabs2").append("Fail to Folders Update:"+Date()+"<br>");
+
+			$("#loadingimg").replaceWith("<div id=\"loadingimg\"></div>");
+		});
+	};
+
+	function LoadMessages(folderid, foldername) {
+
+		$("#loadingimg").replaceWith("<div id=\"loadingimg\"><img src=\"images/ajax-loader.gif\" /></div>");
+
+		var getParams={ };
+		var MessageAPILink = "http://guess.dev.altworx.com/api/messages?folder=(" + folderid + ")";
+
+		$.getJSON(MessageAPILink,getParams, function(MessagesList, textStatus, jqXHR) {
+			gMessagesList = MessagesList;
+			$("#text-tabs2").append("Folder Last Updated from API:"+MessagesList.lastUpdate + "<br>");
+			$("#text-tabs2").append("Message List Updated:"+Date()+"<br>");
+			dataSet = [];
+
+			$.each(MessagesList.messages, function(km, vm){
+				
+				//DataSet for DataTable
+				var tmparray = [];
+				tmparray.push(vm.id, vm.sender, vm.subject, vm.body.substring(0,50)+"...", vm.sendDate, vm.isFavourited, vm.isOpen, vm.priority, vm.body);
+				dataSet.push(tmparray);
+				CurrentMessage = vm;
+			});
+			
+			//DataTable refresh
+			ListMessageTable.clear().draw();
+			ListMessageTable.rows.add(dataSet);
+			ListMessageTable.columns.adjust().draw(); 
+			
+			$("#HeaderFolderName").replaceWith("<div></div><div id=\"HeaderFolderName\">Current Folder Name:"+ foldername +" (id:"+folderid+")<div>");
+	
+			$("#loadingimg").replaceWith("<div id=\"loadingimg\"></div>");
+
+		}).fail(function(jqXHR, textStatus, errorThrown){
+			$("#load-tabs2").replaceWith("<div></div>");
+			$("#text-tabs2").append("Fail to Message List Update:"+Date()+"<br>");
+			$("#loadingimg").replaceWith("<div id=\"loadingimg\"></div>");
+		});
+	};
+	
+	//global Message var pointing
+	function GetMessagesById(messageid) {
+		$.each(gMessagesList.messages, function(km, vm){
+			if (vm.id == messageid){
+				CurrentMessage = vm;
+				return false;
+			}
+		});
+	};
+
+	//This function was not tested because API can not update data. Just a preliminary code.
+	function UpdateCurrentMessage() {
+
+		CurrentMessage.isFavourited = true;
+		CurrentMessage.isOpened = true;
+
+		$.ajax({
+			url: 'http://guess.dev.altworx.com/api/messages/',
+			type: 'PUT',
+			data: CurrentMessage,
+			success: function(data) {
+				alert('Load was performed.');
+			}
+		});
+		alert("No proper test for this funtion was made due to API restrictions!");
+		LoadMessages(FoldersList[0][2],FoldersList[0][1]);
+	};
+
+	//This function was not tested because API can not update data. Just a preliminary code.
+	function DeleteCurrentMessage() {
+		$.ajax({
+			url: 'http://guess.dev.altworx.com/api/messages/',
+			type: 'DELETE',
+			data: CurrentMessage.id,
+			success: function(data) {
+				alert('Delete was performed.');
+			}
+		});
+		alert("No proper test for this funtion was made due to API restrictions!");
+		LoadMessages(FoldersList[0][2],FoldersList[0][1]);
+	};
+
+	$(document).ready(function() {
+
+		// JQuery-UI library
+		$( "#tabs" ).tabs();
+		$( "#button" ).button();
+		
+		$( "#dialog" ).dialog({
+			autoOpen: false,
+			width: 800,
+			buttons: [
+			{
+				text: "Answer",
+				click: function() {
+					$("#dialog-errtext").replaceWith("<div id=\"dialog-errtext\">No API for this function!</div></b></div>");
+					$("#dialog-err" ).dialog( "open" );
+					}
+			},
+			{
+				text: "Forward",
+				click: function() {
+					$("#dialog-errtext").replaceWith("<div id=\"dialog-errtext\">No API for this function!</div></b></div>");
+					$("#dialog-err" ).dialog( "open" );
+				}
+			},
+			{
+				text: "Mark as Favourited",
+				click: function() {
+					$( this ).dialog( "close" );
+					UpdateCurrentMessage();
+				}			
+			},
+			{
+				text: "Delete",
+				click: function() {
+					$( this ).dialog( "close" );
+					DeleteCurrentMessage();
+				}			
+			}
+			]
+		});
+
+		$("#dialog-err").dialog({
+			autoOpen: false,
+			width: 200,
+			buttons: [
+			{
+				text: "OK",
+				click: function() {
+					$( this ).dialog( "close" );
+				}
+			}
+			]
+		});
+		
+		// click on message in the table
+		$('#ListMessageTable tbody').on('click', 'tr', function () {
+			var tmpdata = ListMessageTable.row( this ).data();
+			GetMessagesById(tmpdata[0]);
+			$("#dialog-subject").replaceWith("<div id=\"dialog-subject\"><b>subject:"+CurrentMessage.subject+"</b></div>");
+			$("#dialog-send").replaceWith("<div id=\"dialog-send\">sender:"+CurrentMessage.sender+" - sendDateTime:"+CurrentMessage.sendDate+"</div>");
+			$("#dialog-status").replaceWith("<div id=\"dialog-status\"><i>isFavourited:"+CurrentMessage.isFavourited+" isOpen:"+CurrentMessage.isOpen+" priority:"+CurrentMessage.priority+"</i></div>");
+			$("#dialog-msg").replaceWith("<div id=\"dialog-msg\"><p>"+CurrentMessage.body+"</p></div>");
+		
+			$( "#dialog" ).dialog( "open" );
+		});
+
+		//button for reload the folders list
+		$( "#ReloadFolders").click(function( event ) {
+			LoadFolders();
+			LoadMessages(FoldersList[0][2],FoldersList[0][1]);
+		});
+
+		//click on a folder name in the list
+		$('#tabs-1').on('click', 'a', function () {
+			var tmpid = $(this).attr("id");
+			var tmpname = $(this).attr("title");
+			LoadMessages(tmpid, tmpname);
+		});
+
+		//initial draw of an empty table
+		dataSet.push([ "", "", "", "", "", "", "", ""]);
+		ListMessageTable.clear().draw();
+		ListMessageTable.rows.add(dataSet);
+		ListMessageTable.columns.adjust().draw();
+	
+		LoadFolders();
+	});
+
+})();
+</script>
+	
+</body>
+</html>
